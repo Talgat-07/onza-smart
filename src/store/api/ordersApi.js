@@ -65,6 +65,13 @@ export const ordersApi = createApi({
       }),
       invalidatesTags: ["PickupQr", "DeskRequests", "ClientParcels"],
     }),
+    getIssueOrders: builder.query({
+      query: (token) => ({
+        url: `/get/orders-by-token`,
+        params: { token },
+      }),
+      invalidatesTags: ["order"],
+    }),
   }),
 });
 
@@ -75,4 +82,5 @@ export const {
   useGeneratePickupQrMutation,
   useIssueOrderMutation,
   useGetActivePickupSessionQuery,
+  useGetIssueOrdersQuery,
 } = ordersApi;

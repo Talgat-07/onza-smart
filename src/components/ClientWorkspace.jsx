@@ -1,8 +1,9 @@
-import { Alert, Button, Card, Checkbox, Space, Typography } from "antd";
+import { Alert, Button, Card, Checkbox, List, Space, Tag, Typography } from "antd";
 import { useState } from "react";
 import {
   useCreatePickupRequestMutation,
   useScanClientQrMutation,
+  useGetIssueOrdersQuery
 } from "../store/api/ordersApi";
 
 const { Paragraph, Text, Title } = Typography;
@@ -13,9 +14,15 @@ function ClientWorkspace({ user }) {
   const [scanError, setScanError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
   const [parcels, setParcels] = useState([]);
-
+  const {
+    data: issueOrdersData,
+    isLoading: isIssueOrdersLoading,
+    error: issueOrdersError,
+  } = useGetIssueOrdersQuery();
   const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
   const [sendRequest, { isLoading: isSending }] = useCreatePickupRequestMutation();
+  const issueOrders = issueOrdersData?.orders ?? [];
+  const pickupReadyOrders = issueOrders.filter((order) => Number(order?.status) === 29);
 
   const handleScan = async () => {
     setScanError("");
@@ -58,6 +65,39 @@ function ClientWorkspace({ user }) {
         {greetingText ? (
           <Alert showIcon type="success" message={greetingText} style={{ marginTop: 16 }} />
         ) : null}
+      </Card>
+
+      <Card className="client-card">
+        <Title level={4}>Заказы, которые можно забрать</Title>
+
+        {issueOrdersError ? (
+          <Alert showIcon type="error" message="Не удалось загрузить заказы по токену." />
+        ) : null}
+
+        {!issueOrdersError && !pickupReadyOrders.length && !isIssueOrdersLoading ? (
+          <Alert showIcon type="info" message="Доступных заказов к выдаче нет." />
+        ) : null}
+
+        <List
+          loading={isIssueOrdersLoading}
+          dataSource={pickupReadyOrders}
+          renderItem={(order) => (
+            <List.Item>
+              <Card size="small" className="parcel-row" style={{ width: "100%" }}>
+                <Space direction="vertical" size={4}>
+                  <Text strong>{order.tracking_number}</Text>
+                  <Text type="secondary">GUID: {order.guid}</Text>
+                  <Space>
+                    <Tag color="green">Готов к выдаче</Tag>
+                    <Text type="secondary">
+                      {new Date(order.created_date).toLocaleString("ru-RU")}
+                    </Text>
+                  </Space>
+                </Space>
+              </Card>
+            </List.Item>
+          )}
+        />
       </Card>
 
       <Card className="client-card">
