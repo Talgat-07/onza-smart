@@ -1,30 +1,29 @@
-import { Alert, Col, ConfigProvider, Layout, Row, Space, Typography } from "antd";
+import {
+  Button,
+  ConfigProvider,
+  Layout,
+  Space,
+  Typography,
+} from "antd";
 import "./App.css";
-import LatestCodeCard from "./components/LatestCodeCard";
-import RawStreamCard from "./components/RawStreamCard";
-import ScannerControlCard from "./components/ScannerControlCard";
-import ScanHistoryCard from "./components/ScanHistoryCard";
-import { useSerialScanner } from "./hooks/useSerialScanner";
+import { useDispatch, useSelector } from "react-redux";
+import ClientWorkspace from "./components/ClientWorkspace";
+import DeskWorkspace from "./components/DeskWorkspace";
+import LoginForm from "./components/LoginForm";
+import { logout } from "./store/slices/authSlice";
 
 const { Header, Content } = Layout;
 const { Title, Text } = Typography;
 
 function App() {
-  const {
-    baudRate,
-    isConnected,
-    isConnecting,
-    lastCode,
-    scanHistory,
-    rawLog,
-    errorText,
-    setBaudRate,
-    connectScanner,
-    disconnectScanner,
-    clearLog,
-    totalCodes,
-    emptyCodeValue,
-  } = useSerialScanner();
+  const dispatch = useDispatch();
+  const user = useSelector((state) => state.auth.user);
+  const isAuthenticated = useSelector((state) => Boolean(state.auth.token));
+  const isDesk = user?.role === "desk";
+
+  const onLogout = () => {
+    dispatch(logout());
+  };
 
   return (
     <ConfigProvider
@@ -35,59 +34,32 @@ function App() {
         },
       }}
     >
-      <Layout className="app-layout">
-        <Header className="app-header">
-          <Title level={3} className="app-title">
-            QR Scanner Console
-          </Title>
-          <Text className="app-subtitle">
-            Подключение сканера через Web Serial API и сбор QR-кодов в журнал
-          </Text>
-        </Header>
+      {isAuthenticated ? (
+        <Layout className={`app-layout ${isDesk ? "" : "client-layout"}`}>
+          {isDesk ? (
+            <Header className="app-header">
+              <div>
+                <Title level={3} className="app-title">
+                  Smart Pickup Console
+                </Title>
+                <Text className="app-subtitle">
+                  QR-получение посылок с разделением ролей клиент/выдача
+                </Text>
+              </div>
+              <Space>
+                <Text className="app-user-text">Роль: Выдача | {user?.name ?? "User"}</Text>
+                <Button onClick={onLogout}>Выйти</Button>
+              </Space>
+            </Header>
+          ) : null}
 
-        <Content className="app-content">
-          <Space direction="vertical" size={16} className="full-width">
-            <Alert
-              type="info"
-              showIcon
-              message="Важно"
-              description="Сканер должен работать в режиме Serial (COM). Для чтения QR-кодов обычно используется разделитель Enter/CRLF."
-            />
-
-            {errorText ? <Alert type="error" showIcon message={errorText} /> : null}
-
-            <Row gutter={[16, 16]}>
-              <Col xs={24} lg={12}>
-                <ScannerControlCard
-                  isConnected={isConnected}
-                  isConnecting={isConnecting}
-                  baudRate={baudRate}
-                  onBaudRateChange={setBaudRate}
-                  onConnect={connectScanner}
-                  onDisconnect={disconnectScanner}
-                  onClear={clearLog}
-                />
-              </Col>
-
-              <Col xs={24} lg={12}>
-                <LatestCodeCard
-                  lastCode={lastCode}
-                  totalCodes={totalCodes}
-                  emptyCodeValue={emptyCodeValue}
-                />
-              </Col>
-
-              <Col span={24}>
-                <ScanHistoryCard scanHistory={scanHistory} />
-              </Col>
-
-              <Col span={24}>
-                <RawStreamCard rawLog={rawLog} />
-              </Col>
-            </Row>
-          </Space>
-        </Content>
-      </Layout>
+          <Content className={`app-content ${isDesk ? "" : "client-content"}`}>
+            {isDesk ? <DeskWorkspace user={user} /> : <ClientWorkspace user={user} />}
+          </Content>
+        </Layout>
+      ) : (
+        <LoginForm />
+      )}
     </ConfigProvider>
   );
 }

@@ -2,11 +2,15 @@
   min-height: 100vh;
 }
 
+.client-layout {
+  background: linear-gradient(160deg, #0958d9 0%, #1677ff 45%, #69b1ff 100%);
+}
+
 .app-header {
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  gap: 4px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   min-height: 88px;
   height: auto;
   padding: 16px 24px;
@@ -22,16 +26,49 @@
   color: rgba(255, 255, 255, 0.9);
 }
 
+.app-user-text.ant-typography {
+  color: #ffffff;
+}
+
 .app-content {
   width: 100%;
-  max-width: 1180px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 24px;
   box-sizing: border-box;
 }
 
+.client-content {
+  max-width: 860px;
+  padding-top: 40px;
+}
+
 .full-width {
   width: 100%;
+}
+
+.auth-layout {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+}
+
+.parcel-row {
+  border-radius: 10px;
+}
+
+.client-card {
+  border: 0;
+  border-radius: 14px;
+  box-shadow: 0 12px 28px rgba(5, 29, 82, 0.2);
 }
 
 .last-code.ant-typography {
@@ -50,7 +87,17 @@
     padding: 16px;
   }
 
+  .client-content {
+    padding-top: 24px;
+  }
+
   .app-header {
     padding: 14px 16px;
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .app-user-text.ant-typography {
+    display: block;
   }
 }

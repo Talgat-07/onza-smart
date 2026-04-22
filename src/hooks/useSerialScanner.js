@@ -62,7 +62,7 @@ export function useSerialScanner() {
     }
 
     if (readableClosed) {
-      await readableClosed.catch(() => {});
+      await readableClosed.catch(() => { });
     }
 
     if (port) {
@@ -150,7 +150,7 @@ export function useSerialScanner() {
         readerRef.current = null;
 
         if (readableClosedRef.current) {
-          await readableClosedRef.current.catch(() => {});
+          await readableClosedRef.current.catch(() => { });
           readableClosedRef.current = null;
         }
 
