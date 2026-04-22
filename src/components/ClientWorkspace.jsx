@@ -4,6 +4,8 @@ import {
   useCreatePickupRequestMutation,
   useScanClientQrMutation,
 } from "../store/api/ordersApi";
+import { useSerialScanner } from "./../hooks/useSerialScanner";
+import ScannerControlCard from "../components/ScannerControlCard";
 
 const { Paragraph, Text, Title } = Typography;
 
@@ -15,7 +17,24 @@ function ClientWorkspace({ user }) {
   const [parcels, setParcels] = useState([]);
 
   const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
-  const [sendRequest, { isLoading: isSending }] = useCreatePickupRequestMutation();
+  const [sendRequest, { isLoading: isSending }] =
+    useCreatePickupRequestMutation();
+
+  const {
+    baudRate,
+    isConnected,
+    isConnecting,
+    lastCode,
+    scanHistory,
+    rawLog,
+    errorText,
+    setBaudRate,
+    connectScanner,
+    disconnectScanner,
+    clearLog,
+    totalCodes,
+    emptyCodeValue,
+  } = useSerialScanner();
 
   const handleScan = async () => {
     setScanError("");
@@ -36,7 +55,10 @@ function ClientWorkspace({ user }) {
   const handleSendRequest = async () => {
     setRequestMessage("");
     try {
-      const result = await sendRequest({ user, parcelIds: selectedParcels }).unwrap();
+      const result = await sendRequest({
+        user,
+        parcelIds: selectedParcels,
+      }).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
       setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
@@ -45,18 +67,44 @@ function ClientWorkspace({ user }) {
 
   return (
     <Space direction="vertical" size={16} className="full-width">
+      <ScannerControlCard
+        isConnected={isConnected}
+        isConnecting={isConnecting}
+        baudRate={baudRate}
+        onBaudRateChange={setBaudRate}
+        onConnect={connectScanner}
+        onDisconnect={disconnectScanner}
+        onClear={clearLog}
+      />
       <Card className="client-card">
-        <Title level={3} >Терминал клиента</Title>
-        <Paragraph type="secondary">Ожидание сканирования QR клиента.</Paragraph>
+        <Title level={3}>Терминал клиента</Title>
+        <Paragraph type="secondary">
+          Ожидание сканирования QR клиента.
+        </Paragraph>
         {isScanning ? (
-          <Alert showIcon type="info" message="Идет обработка QR..." style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="info"
+            message="Идет обработка QR..."
+            style={{ marginTop: 16 }}
+          />
         ) : null}
 
         {scanError ? (
-          <Alert showIcon type="error" message={scanError} style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="error"
+            message={scanError}
+            style={{ marginTop: 16 }}
+          />
         ) : null}
         {greetingText ? (
-          <Alert showIcon type="success" message={greetingText} style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="success"
+            message={greetingText}
+            style={{ marginTop: 16 }}
+          />
         ) : null}
       </Card>
 
@@ -84,7 +132,11 @@ function ClientWorkspace({ user }) {
             </Space>
           </Checkbox.Group>
         ) : (
-          <Alert type="info" showIcon message="Сначала отсканируйте QR клиента." />
+          <Alert
+            type="info"
+            showIcon
+            message="Сначала отсканируйте QR клиента."
+          />
         )}
 
         <Button
@@ -98,7 +150,12 @@ function ClientWorkspace({ user }) {
         </Button>
 
         {requestMessage ? (
-          <Alert showIcon type="success" message={requestMessage} style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="success"
+            message={requestMessage}
+            style={{ marginTop: 16 }}
+          />
         ) : null}
       </Card>
     </Space>
