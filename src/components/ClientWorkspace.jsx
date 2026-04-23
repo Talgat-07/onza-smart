@@ -9,7 +9,7 @@ import {
 const { Paragraph, Text, Title } = Typography;
 
 function ClientWorkspace({ user }) {
-  const [selectedParcels, setSelectedParcels] = useState([]);
+  const [selectedParcels, setSelectedParcels] = useState("1756b162ebec07946ae9a70408d06b376722666034e6024783fe822727d4717f");
   const [greetingText, setGreetingText] = useState("");
   const [scanError, setScanError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
@@ -18,32 +18,19 @@ function ClientWorkspace({ user }) {
     data: issueOrdersData,
     isLoading: isIssueOrdersLoading,
     error: issueOrdersError,
-  } = useGetIssueOrdersQuery();
-  const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
+  } = useGetIssueOrdersQuery(selectedParcels);
+
   const [sendRequest, { isLoading: isSending }] = useCreatePickupRequestMutation();
   const issueOrders = issueOrdersData?.orders ?? [];
   const pickupReadyOrders = issueOrders.filter((order) => Number(order?.status) === 29);
+  console.log("issueOrdersData: ", issueOrdersData);
 
-  const handleScan = async () => {
-    setScanError("");
-    setGreetingText("");
-    setRequestMessage("");
-    setSelectedParcels([]);
 
-    try {
-      const result = await scanQr().unwrap();
-      setGreetingText(result.greeting);
-      setParcels(result.parcels);
-    } catch (error) {
-      setParcels([]);
-      setScanError(error?.data?.message ?? "Не удалось обработать QR.");
-    }
-  };
 
   const handleSendRequest = async () => {
     setRequestMessage("");
     try {
-      const result = await sendRequest({ user, parcelIds: selectedParcels }).unwrap();
+      const result = await sendRequest(selectedParcels).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
       setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
@@ -55,7 +42,7 @@ function ClientWorkspace({ user }) {
       <Card className="client-card">
         <Title level={3} >Терминал клиента</Title>
         <Paragraph type="secondary">Ожидание сканирования QR клиента.</Paragraph>
-        {isScanning ? (
+        {false ? (
           <Alert showIcon type="info" message="Идет обработка QR..." style={{ marginTop: 16 }} />
         ) : null}
 
@@ -132,7 +119,7 @@ function ClientWorkspace({ user }) {
           style={{ marginTop: 16 }}
           onClick={handleSendRequest}
           loading={isSending}
-          disabled={!selectedParcels.length}
+          disabled={!selectedParcels}
         >
           Отправить заявку на выдачу
         </Button>

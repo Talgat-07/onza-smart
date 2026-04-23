@@ -3,7 +3,7 @@ import { createApi, fetchBaseQuery } from "@reduxjs/toolkit/query/react";
 export const ordersApi = createApi({
   reducerPath: "ordersApi",
   baseQuery: fetchBaseQuery({
-    baseUrl: "http://onza-api.ibm.kg/api/order",
+    baseUrl: "https://onza-api.ibm.kg/api/order",
     prepareHeaders: (headers, { getState }) => {
       const token = getState()?.auth?.token;
       if (token) {
@@ -25,12 +25,11 @@ export const ordersApi = createApi({
       invalidatesTags: (_result, _error, arg) => [{ type: "ClientParcels", id: arg?.qrCode }],
     }),
     createPickupRequest: builder.mutation({
-      query: ({ user, parcelIds }) => ({
+      query: (parcelIds) => ({
         url: "/smart/pickup-request",
         method: "POST",
         body: {
-          user_guid: user?.id,
-          parcel_ids: parcelIds,
+          token: parcelIds,
         },
       }),
       invalidatesTags: (_result, _error, arg) => [{ type: "DeskRequests", id: arg.user.deskId }],
@@ -39,7 +38,6 @@ export const ordersApi = createApi({
       query: ({ deskId }) => ({
         url: "/smart/desk-requests",
         method: "GET",
-        params: { desk_id: deskId },
       }),
       providesTags: (_result, _error, arg) => [{ type: "DeskRequests", id: arg.deskId }],
     }),

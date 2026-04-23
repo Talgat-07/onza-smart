@@ -1,19 +1,23 @@
 import { Alert, Card, Input, List, Space, Tag, Typography } from "antd";
-import { useState } from "react";
-import { useGetDeskRequestsQuery, useIssueOrderMutation } from "../store/api/ordersApi";
+import { useEffect, useState } from "react";
+import { useGetDeskRequestsQuery, useGetIssueOrdersQuery, useScanClientQrMutation } from "../store/api/ordersApi";
 
 const { Paragraph, Text, Title } = Typography;
 
 function DeskWorkspace({ user }) {
   const [qrTokenInput, setQrTokenInput] = useState(
-    "35467153a6942af72c36485f6a09ef1b8fe06761eaeaccb8db97ca04f5e6d8bf",
   );
+  const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
   const [issueMessage, setIssueMessage] = useState("");
-  const { data = [], isLoading } = useGetDeskRequestsQuery(
+  const { data: deskRequestsData, isLoading } = useGetDeskRequestsQuery(
     { deskId: user.deskId },
     { pollingInterval: 5000 },
   );
-  const [issueOrder, { isLoading: isIssuing }] = useIssueOrderMutation();
+  const {
+    data: issueOrdersData,
+    isLoading: isIssuing,
+    error: issueOrdersError,
+  } = useGetIssueOrdersQuery(qrTokenInput);
 
   const handleIssueByEnter = async () => {
     if (!qrTokenInput.trim()) {
@@ -29,6 +33,23 @@ function DeskWorkspace({ user }) {
       setIssueMessage(error?.data?.message ?? "Не удалось выдать заказ.");
     }
   };
+
+  const handleScan = async () => {
+    try {
+      const result = await scanQr().unwrap();
+      setGreetingText(result.greeting);
+      setParcels(result.parcels);
+    } catch (error) {
+      setParcels([]);
+      setScanError(error?.data?.message ?? "Не удалось обработать QR.");
+    }
+  };
+
+  useEffect(() => {
+    if (deskRequestsData?.success) {
+      setQrTokenInput(deskRequestsData.result?.qr_token);
+    }
+  }, [deskRequestsData]);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
@@ -54,20 +75,20 @@ function DeskWorkspace({ user }) {
       </Card>
 
       <Card title="Входящие заявки от клиентов">
-        {!data.length && !isLoading ? (
+        {!issueOrdersData?.orders?.length && !isLoading ? (
           <Alert type="info" showIcon message="Новых заявок пока нет." />
         ) : (
           <List
             loading={isLoading}
-            dataSource={data}
+            dataSource={issueOrdersData?.orders}
             renderItem={(item) => (
               <List.Item>
                 <Space direction="vertical" size={2}>
                   <Text strong>
-                    {item.clientName} ({item.clientCode})
+                    {item.tracking_number}
                   </Text>
-                  <Text type="secondary">Время: {item.createdAt}</Text>
-                  <Text>К выдаче: {item.parcelIds.join(", ")}</Text>
+                  <Text type="secondary">Дата создания: {item.created_date}</Text>
+                  {/* <Text>К выдаче: {item.tracking_number}</Text> */}
                 </Space>
               </List.Item>
             )}
