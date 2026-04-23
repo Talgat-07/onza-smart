@@ -1,4 +1,4 @@
-import { Alert, Card, Input, List, Space, Tag, Typography } from "antd";
+import { Alert, Button, Card, Input, List, Space, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
 import { useGetDeskRequestsQuery, useGetIssueOrdersQuery, useScanClientQrMutation } from "../store/api/ordersApi";
 
@@ -36,7 +36,7 @@ function DeskWorkspace({ user }) {
 
   const handleScan = async () => {
     try {
-      const result = await scanQr().unwrap();
+      const result = await scanQr(qrTokenInput).unwrap();
       setGreetingText(result.greeting);
       setParcels(result.parcels);
     } catch (error) {
@@ -95,6 +95,9 @@ function DeskWorkspace({ user }) {
           />
         )}
       </Card>
+      <Button onClick={() => {
+        handleScan();
+      }}>Выдать</Button>
     </Space>
   );
 }

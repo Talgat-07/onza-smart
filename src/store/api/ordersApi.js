@@ -16,7 +16,7 @@ export const ordersApi = createApi({
   endpoints: (builder) => ({
     scanClientQr: builder.mutation({
       query: (qrCode) => ({
-        url: "/smart/scan-qr",
+        url: "/smart/issue-token-order",
         method: "POST",
         body: {
           token: qrCode

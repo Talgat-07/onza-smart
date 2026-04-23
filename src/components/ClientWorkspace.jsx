@@ -11,7 +11,6 @@ import {
 import { useEffect, useRef, useState } from "react";
 import {
   useCreatePickupRequestMutation,
-  useScanClientQrMutation,
   useGetIssueOrdersQuery,
 } from "../store/api/ordersApi";
 import ScannerControlCard from "../components/ScannerControlCard";
@@ -35,7 +34,6 @@ function ClientWorkspace({ user }) {
     totalCodes,
     emptyCodeValue,
   } = useSerialScanner();
-  const [selectedParcels, setSelectedParcels] = useState(lastCode);
   const [greetingText, setGreetingText] = useState("");
   const [scanError, setScanError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
@@ -45,7 +43,6 @@ function ClientWorkspace({ user }) {
     isLoading: isIssueOrdersLoading,
     error: issueOrdersError,
   } = useGetIssueOrdersQuery(lastCode);
-  const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
   const [sendRequest, { isLoading: isSending }] =
     useCreatePickupRequestMutation();
   const lastSubmittedSelectionRef = useRef("");
@@ -61,7 +58,7 @@ function ClientWorkspace({ user }) {
       .join("|");
 
   const handleSendRequest = async () => {
-    const selectionKey = getSelectionKey(selectedParcels);
+    const selectionKey = getSelectionKey(lastCode);
     if (!selectionKey) {
       return;
     }
@@ -69,7 +66,7 @@ function ClientWorkspace({ user }) {
     lastSubmittedSelectionRef.current = selectionKey;
     setRequestMessage("");
     try {
-      const result = await sendRequest(selectedParcels
+      const result = await sendRequest(lastCode
       ).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
@@ -78,7 +75,7 @@ function ClientWorkspace({ user }) {
   };
 
   useEffect(() => {
-    const selectionKey = getSelectionKey(selectedParcels);
+    const selectionKey = getSelectionKey(lastCode);
     if (!selectionKey || selectionKey === lastSubmittedSelectionRef.current || isSending) {
       return undefined;
     }
@@ -88,13 +85,11 @@ function ClientWorkspace({ user }) {
     }, 2000);
 
     return () => clearTimeout(timeoutId);
-  }, [isSending, selectedParcels]);
+  }, [isSending, lastCode]);
 
   useEffect(() => {
-    if (pickupReadyOrders.length) {
-      handleSendRequest()
-    }
-  }, [issueOrders, selectedParcels]);
+    handleSendRequest()
+  }, [lastCode]);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
@@ -119,14 +114,7 @@ function ClientWorkspace({ user }) {
         <Paragraph type="secondary">
           Ожидание сканирования QR клиента.
         </Paragraph>
-        {isScanning ? (
-          <Alert
-            showIcon
-            type="info"
-            message="Идет обработка QR..."
-            style={{ marginTop: 16 }}
-          />
-        ) : null}
+
 
         {scanError ? (
           <Alert
@@ -147,7 +135,7 @@ function ClientWorkspace({ user }) {
       </Card>
 
       <Card className="client-card">
-        <Title level={4}>Заказы, которые можно забрать</Title>
+        <Title level={4}>Заказы:</Title>
 
         {issueOrdersError ? (
           <Alert
