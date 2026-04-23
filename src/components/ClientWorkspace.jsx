@@ -5,11 +5,29 @@ import {
   useScanClientQrMutation,
   useGetIssueOrdersQuery
 } from "../store/api/ordersApi";
-
+import ScannerControlCard from "../components/ScannerControlCard";
+import { useSerialScanner } from "./../hooks/useSerialScanner";
+import LatestCodeCard from "../components/LatestCodeCard";
 const { Paragraph, Text, Title } = Typography;
 
 function ClientWorkspace({ user }) {
-  const [selectedParcels, setSelectedParcels] = useState("1756b162ebec07946ae9a70408d06b376722666034e6024783fe822727d4717f");
+
+  const {
+    baudRate,
+    isConnected,
+    isConnecting,
+    lastCode,
+    scanHistory,
+    rawLog,
+    errorText,
+    setBaudRate,
+    connectScanner,
+    disconnectScanner,
+    clearLog,
+    totalCodes,
+    emptyCodeValue,
+  } = useSerialScanner();
+  const [selectedParcels, setSelectedParcels] = useState([]);
   const [greetingText, setGreetingText] = useState("");
   const [scanError, setScanError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
@@ -18,19 +36,32 @@ function ClientWorkspace({ user }) {
     data: issueOrdersData,
     isLoading: isIssueOrdersLoading,
     error: issueOrdersError,
-  } = useGetIssueOrdersQuery(selectedParcels);
-
+  } = useGetIssueOrdersQuery();
+  const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
   const [sendRequest, { isLoading: isSending }] = useCreatePickupRequestMutation();
   const issueOrders = issueOrdersData?.orders ?? [];
   const pickupReadyOrders = issueOrders.filter((order) => Number(order?.status) === 29);
-  console.log("issueOrdersData: ", issueOrdersData);
 
+  const handleScan = async () => {
+    setScanError("");
+    setGreetingText("");
+    setRequestMessage("");
+    setSelectedParcels([]);
 
+    try {
+      const result = await scanQr().unwrap();
+      setGreetingText(result.greeting);
+      setParcels(result.parcels);
+    } catch (error) {
+      setParcels([]);
+      setScanError(error?.data?.message ?? "Не удалось обработать QR.");
+    }
+  };
 
   const handleSendRequest = async () => {
     setRequestMessage("");
     try {
-      const result = await sendRequest(selectedParcels).unwrap();
+      const result = await sendRequest({ user, parcelIds: selectedParcels }).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
       setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
@@ -39,10 +70,26 @@ function ClientWorkspace({ user }) {
 
   return (
     <Space direction="vertical" size={16} className="full-width">
+      {!isConnected && (
+        <ScannerControlCard
+          isConnected={isConnected}
+          isConnecting={isConnecting}
+          baudRate={baudRate}
+          onBaudRateChange={setBaudRate}
+          onConnect={connectScanner}
+          onDisconnect={disconnectScanner}
+          onClear={clearLog}
+        />
+      )}
+      <LatestCodeCard
+        lastCode={lastCode}
+        totalCodes={totalCodes}
+        emptyCodeValue={emptyCodeValue}
+      />
       <Card className="client-card">
         <Title level={3} >Терминал клиента</Title>
         <Paragraph type="secondary">Ожидание сканирования QR клиента.</Paragraph>
-        {false ? (
+        {isScanning ? (
           <Alert showIcon type="info" message="Идет обработка QR..." style={{ marginTop: 16 }} />
         ) : null}
 
@@ -119,7 +166,7 @@ function ClientWorkspace({ user }) {
           style={{ marginTop: 16 }}
           onClick={handleSendRequest}
           loading={isSending}
-          disabled={!selectedParcels}
+          disabled={!selectedParcels.length}
         >
           Отправить заявку на выдачу
         </Button>
