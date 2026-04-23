@@ -8,7 +8,7 @@ import {
   Tag,
   Typography,
 } from "antd";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   useCreatePickupRequestMutation,
   useScanClientQrMutation,
@@ -35,7 +35,7 @@ function ClientWorkspace({ user }) {
     totalCodes,
     emptyCodeValue,
   } = useSerialScanner();
-  const [selectedParcels, setSelectedParcels] = useState([]);
+  const [selectedParcels, setSelectedParcels] = useState(lastCode);
   const [greetingText, setGreetingText] = useState("");
   const [scanError, setScanError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
@@ -44,28 +44,51 @@ function ClientWorkspace({ user }) {
     data: issueOrdersData,
     isLoading: isIssueOrdersLoading,
     error: issueOrdersError,
-  } = useGetIssueOrdersQuery();
+  } = useGetIssueOrdersQuery(lastCode);
   const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
   const [sendRequest, { isLoading: isSending }] =
     useCreatePickupRequestMutation();
+  const lastSubmittedSelectionRef = useRef("");
   const issueOrders = issueOrdersData?.orders ?? [];
   const pickupReadyOrders = issueOrders.filter(
     (order) => Number(order?.status) === 29,
   );
 
+  const getSelectionKey = (selection) =>
+    [...selection]
+      .map(String)
+      .sort()
+      .join("|");
 
   const handleSendRequest = async () => {
+    const selectionKey = getSelectionKey(selectedParcels);
+    if (!selectionKey) {
+      return;
+    }
+
+    lastSubmittedSelectionRef.current = selectionKey;
     setRequestMessage("");
     try {
-      const result = await sendRequest({
-        user,
-        parcelIds: selectedParcels,
-      }).unwrap();
+      const result = await sendRequest(selectedParcels
+      ).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
       setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
     }
   };
+
+  useEffect(() => {
+    const selectionKey = getSelectionKey(selectedParcels);
+    if (!selectionKey || selectionKey === lastSubmittedSelectionRef.current || isSending) {
+      return undefined;
+    }
+
+    const timeoutId = setTimeout(() => {
+      handleSendRequest();
+    }, 2000);
+
+    return () => clearTimeout(timeoutId);
+  }, [isSending, selectedParcels]);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
