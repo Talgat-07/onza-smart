@@ -53,21 +53,6 @@ function ClientWorkspace({ user }) {
     (order) => Number(order?.status) === 29,
   );
 
-  const handleScan = async () => {
-    setScanError("");
-    setGreetingText("");
-    setRequestMessage("");
-    setSelectedParcels([]);
-
-    try {
-      const result = await scanQr().unwrap();
-      setGreetingText(result.greeting);
-      setParcels(result.parcels);
-    } catch (error) {
-      setParcels([]);
-      setScanError(error?.data?.message ?? "Не удалось обработать QR.");
-    }
-  };
 
   const handleSendRequest = async () => {
     setRequestMessage("");
@@ -144,8 +129,8 @@ function ClientWorkspace({ user }) {
         ) : null}
 
         {!issueOrdersError &&
-        !pickupReadyOrders.length &&
-        !isIssueOrdersLoading ? (
+          !pickupReadyOrders.length &&
+          !isIssueOrdersLoading ? (
           <Alert
             showIcon
             type="info"
