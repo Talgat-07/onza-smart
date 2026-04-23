@@ -1,9 +1,18 @@
-import { Alert, Button, Card, Checkbox, List, Space, Tag, Typography } from "antd";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  List,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
 import { useState } from "react";
 import {
   useCreatePickupRequestMutation,
   useScanClientQrMutation,
-  useGetIssueOrdersQuery
+  useGetIssueOrdersQuery,
 } from "../store/api/ordersApi";
 import ScannerControlCard from "../components/ScannerControlCard";
 import { useSerialScanner } from "./../hooks/useSerialScanner";
@@ -11,7 +20,6 @@ import LatestCodeCard from "../components/LatestCodeCard";
 const { Paragraph, Text, Title } = Typography;
 
 function ClientWorkspace({ user }) {
-
   const {
     baudRate,
     isConnected,
@@ -38,9 +46,12 @@ function ClientWorkspace({ user }) {
     error: issueOrdersError,
   } = useGetIssueOrdersQuery();
   const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
-  const [sendRequest, { isLoading: isSending }] = useCreatePickupRequestMutation();
+  const [sendRequest, { isLoading: isSending }] =
+    useCreatePickupRequestMutation();
   const issueOrders = issueOrdersData?.orders ?? [];
-  const pickupReadyOrders = issueOrders.filter((order) => Number(order?.status) === 29);
+  const pickupReadyOrders = issueOrders.filter(
+    (order) => Number(order?.status) === 29,
+  );
 
   const handleScan = async () => {
     setScanError("");
@@ -61,7 +72,10 @@ function ClientWorkspace({ user }) {
   const handleSendRequest = async () => {
     setRequestMessage("");
     try {
-      const result = await sendRequest({ user, parcelIds: selectedParcels }).unwrap();
+      const result = await sendRequest({
+        user,
+        parcelIds: selectedParcels,
+      }).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
       setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
@@ -87,17 +101,34 @@ function ClientWorkspace({ user }) {
         emptyCodeValue={emptyCodeValue}
       />
       <Card className="client-card">
-        <Title level={3} >Терминал клиента</Title>
-        <Paragraph type="secondary">Ожидание сканирования QR клиента.</Paragraph>
+        <Title level={3}>Терминал клиента</Title>
+        <Paragraph type="secondary">
+          Ожидание сканирования QR клиента.
+        </Paragraph>
         {isScanning ? (
-          <Alert showIcon type="info" message="Идет обработка QR..." style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="info"
+            message="Идет обработка QR..."
+            style={{ marginTop: 16 }}
+          />
         ) : null}
 
         {scanError ? (
-          <Alert showIcon type="error" message={scanError} style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="error"
+            message={scanError}
+            style={{ marginTop: 16 }}
+          />
         ) : null}
         {greetingText ? (
-          <Alert showIcon type="success" message={greetingText} style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="success"
+            message={greetingText}
+            style={{ marginTop: 16 }}
+          />
         ) : null}
       </Card>
 
@@ -105,11 +136,21 @@ function ClientWorkspace({ user }) {
         <Title level={4}>Заказы, которые можно забрать</Title>
 
         {issueOrdersError ? (
-          <Alert showIcon type="error" message="Не удалось загрузить заказы по токену." />
+          <Alert
+            showIcon
+            type="error"
+            message="Не удалось загрузить заказы по токену."
+          />
         ) : null}
 
-        {!issueOrdersError && !pickupReadyOrders.length && !isIssueOrdersLoading ? (
-          <Alert showIcon type="info" message="Доступных заказов к выдаче нет." />
+        {!issueOrdersError &&
+        !pickupReadyOrders.length &&
+        !isIssueOrdersLoading ? (
+          <Alert
+            showIcon
+            type="info"
+            message="Доступных заказов к выдаче нет."
+          />
         ) : null}
 
         <List
@@ -117,7 +158,11 @@ function ClientWorkspace({ user }) {
           dataSource={pickupReadyOrders}
           renderItem={(order) => (
             <List.Item>
-              <Card size="small" className="parcel-row" style={{ width: "100%" }}>
+              <Card
+                size="small"
+                className="parcel-row"
+                style={{ width: "100%" }}
+              >
                 <Space direction="vertical" size={4}>
                   <Text strong>{order.tracking_number}</Text>
                   <Text type="secondary">GUID: {order.guid}</Text>
@@ -158,7 +203,11 @@ function ClientWorkspace({ user }) {
             </Space>
           </Checkbox.Group>
         ) : (
-          <Alert type="info" showIcon message="Сначала отсканируйте QR клиента." />
+          <Alert
+            type="info"
+            showIcon
+            message="Сначала отсканируйте QR клиента."
+          />
         )}
 
         <Button
@@ -172,7 +221,12 @@ function ClientWorkspace({ user }) {
         </Button>
 
         {requestMessage ? (
-          <Alert showIcon type="success" message={requestMessage} style={{ marginTop: 16 }} />
+          <Alert
+            showIcon
+            type="success"
+            message={requestMessage}
+            style={{ marginTop: 16 }}
+          />
         ) : null}
       </Card>
     </Space>
