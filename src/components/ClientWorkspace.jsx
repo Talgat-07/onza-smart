@@ -16,6 +16,11 @@ import {
 import ScannerControlCard from "../components/ScannerControlCard";
 import { useSerialScanner } from "./../hooks/useSerialScanner";
 import LatestCodeCard from "../components/LatestCodeCard";
+
+import voice_1_1 from "../assets/voice/voice_1_1.mp3";
+import voice_2_1 from "../assets/voice/voice_2_1.mp3";
+import voice_3_1 from "../assets/voice/voice_3_1.mp3";
+
 const { Paragraph, Text, Title } = Typography;
 
 function ClientWorkspace({ user }) {
@@ -34,6 +39,7 @@ function ClientWorkspace({ user }) {
     totalCodes,
     emptyCodeValue,
   } = useSerialScanner();
+
   const [greetingText, setGreetingText] = useState("");
   const [scanError, setScanError] = useState("");
   const [requestMessage, setRequestMessage] = useState("");
@@ -43,31 +49,58 @@ function ClientWorkspace({ user }) {
     isLoading: isIssueOrdersLoading,
     error: issueOrdersError,
   } = useGetIssueOrdersQuery(lastCode);
+
   const [sendRequest, { isLoading: isSending }] =
     useCreatePickupRequestMutation();
+
   const lastSubmittedSelectionRef = useRef("");
+  const pendingAudioResultRef = useRef(false);
+
+  const audioQueue = useRef([]);
+  const isPlaying = useRef(false);
+
+  const playSound = (src) => {
+    audioQueue.current.push(src);
+    processQueue();
+  };
+
+  const processQueue = () => {
+    if (isPlaying.current || audioQueue.current.length === 0) return;
+
+    isPlaying.current = true;
+    const src = audioQueue.current.shift();
+    const audio = new Audio(src);
+
+    audio.onended = () => {
+      isPlaying.current = false;
+      processQueue();
+    };
+
+    audio.onerror = () => {
+      console.warn("Ошибка воспроизведения звука:", src);
+      isPlaying.current = false;
+      processQueue();
+    };
+
+    audio.play().catch((err) => {
+      console.error("Audio playback failed:", err);
+      isPlaying.current = false;
+      processQueue();
+    });
+  };
+
   const issueOrders = issueOrdersData?.orders ?? [];
   const pickupReadyOrders = issueOrders.filter(
     (order) => Number(order?.status) === 29,
   );
 
   const getSelectionKey = (selection) =>
-    [...selection]
-      .map(String)
-      .sort()
-      .join("|");
+    [...(selection || [])].map(String).sort().join("|");
 
-  const handleSendRequest = async () => {
-    const selectionKey = getSelectionKey(lastCode);
-    if (!selectionKey) {
-      return;
-    }
-
-    lastSubmittedSelectionRef.current = selectionKey;
+  const handleSendRequest = async (currentCode) => {
     setRequestMessage("");
     try {
-      const result = await sendRequest(lastCode
-      ).unwrap();
+      const result = await sendRequest(currentCode).unwrap();
       setRequestMessage(result.message);
     } catch (error) {
       setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
@@ -76,20 +109,45 @@ function ClientWorkspace({ user }) {
 
   useEffect(() => {
     const selectionKey = getSelectionKey(lastCode);
-    if (!selectionKey || selectionKey === lastSubmittedSelectionRef.current || isSending) {
-      return undefined;
+
+    if (
+      !selectionKey ||
+      selectionKey === emptyCodeValue ||
+      selectionKey === lastSubmittedSelectionRef.current
+    ) {
+      return;
     }
 
-    const timeoutId = setTimeout(() => {
-      handleSendRequest();
-    }, 2000);
+    lastSubmittedSelectionRef.current = selectionKey;
 
-    return () => clearTimeout(timeoutId);
-  }, [isSending, lastCode]);
+    playSound(voice_1_1);
+
+    pendingAudioResultRef.current = true;
+
+    handleSendRequest(lastCode);
+  }, [lastCode, emptyCodeValue]);
 
   useEffect(() => {
-    handleSendRequest()
-  }, [lastCode]);
+    if (pendingAudioResultRef.current && !isIssueOrdersLoading) {
+      if (issueOrdersError) {
+        pendingAudioResultRef.current = false;
+        playSound(voice_3_1);
+      } else if (issueOrdersData) {
+        pendingAudioResultRef.current = false;
+
+        if (pickupReadyOrders.length > 0) {
+          playSound(voice_2_1);
+        } else {
+          playSound(voice_3_1);
+        }
+      }
+    }
+  }, [
+    isIssueOrdersLoading,
+    issueOrdersData,
+    issueOrdersError,
+    pickupReadyOrders.length,
+  ]);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
@@ -114,7 +172,6 @@ function ClientWorkspace({ user }) {
         <Paragraph type="secondary">
           Ожидание сканирования QR клиента.
         </Paragraph>
-
 
         {scanError ? (
           <Alert
@@ -146,8 +203,8 @@ function ClientWorkspace({ user }) {
         ) : null}
 
         {!issueOrdersError &&
-          !pickupReadyOrders.length &&
-          !isIssueOrdersLoading ? (
+        !pickupReadyOrders.length &&
+        !isIssueOrdersLoading ? (
           <Alert
             showIcon
             type="info"
@@ -180,8 +237,6 @@ function ClientWorkspace({ user }) {
           )}
         />
       </Card>
-
-
     </Space>
   );
 }
