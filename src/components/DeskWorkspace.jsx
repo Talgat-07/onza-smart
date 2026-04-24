@@ -9,6 +9,7 @@ function DeskWorkspace({ user }) {
   );
   const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
   const [issueMessage, setIssueMessage] = useState("");
+  const [issueStatus, setIssueStatus] = useState(""); // success | error
   const { data: deskRequestsData, isLoading } = useGetDeskRequestsQuery(
     { deskId: user.deskId },
     { pollingInterval: 5000 },
@@ -17,6 +18,7 @@ function DeskWorkspace({ user }) {
     data: issueOrdersData,
     isLoading: isIssuing,
     error: issueOrdersError,
+    refetch
   } = useGetIssueOrdersQuery(qrTokenInput);
 
   const handleIssueByEnter = async () => {
@@ -35,19 +37,31 @@ function DeskWorkspace({ user }) {
   };
 
   const handleScan = async () => {
+    if (!qrTokenInput) {
+      setIssueStatus("error");
+      setIssueMessage("Нет QR токена");
+      return;
+    }
+
     try {
       const result = await scanQr(qrTokenInput).unwrap();
-      setGreetingText(result.greeting);
-      setParcels(result.parcels);
+
+      setIssueStatus("success");
+      setIssueMessage(result?.message || "Заказ успешно выдан");
+
+      // 🔥 ВАЖНО: обновляем после выдачи
+      await refetch();
+
     } catch (error) {
-      setParcels([]);
-      setScanError(error?.data?.message ?? "Не удалось обработать QR.");
+      setIssueStatus("error");
+      setIssueMessage(error?.data?.message || "Ошибка выдачи");
     }
   };
 
   useEffect(() => {
     if (deskRequestsData?.success) {
       setQrTokenInput(deskRequestsData.result?.qr_token);
+      setIssueMessage(null)
     }
   }, [deskRequestsData]);
 
@@ -98,6 +112,14 @@ function DeskWorkspace({ user }) {
       <Button onClick={() => {
         handleScan();
       }}>Выдать</Button>
+      {issueMessage && (
+        <Alert
+          showIcon
+          type={issueStatus === "success" ? "success" : "error"}
+          message={issueMessage}
+          style={{ marginTop: 12 }}
+        />
+      )}
     </Space>
   );
 }

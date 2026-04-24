@@ -22,7 +22,7 @@ export const ordersApi = createApi({
           token: qrCode
         },
       }),
-      invalidatesTags: 'DeskRequests',
+      invalidatesTags: ['DeskRequests'],
     }),
     createPickupRequest: builder.mutation({
       query: (parcelIds) => ({

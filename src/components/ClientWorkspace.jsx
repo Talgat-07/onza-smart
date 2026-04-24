@@ -16,7 +16,13 @@ import ScannerControlCard from "../components/ScannerControlCard";
 import { useSerialScanner } from "./../hooks/useSerialScanner";
 import LatestCodeCard from "../components/LatestCodeCard";
 
-const { Text, Title } = Typography;
+import voice_1_1 from "../assets/voice/voice_1_1.mp3";
+import voice_2_1 from "../assets/voice/voice_2_1.mp3";
+import voice_3_1 from "../assets/voice/voice_3_1.mp3";
+
+const { Paragraph, Text, Title } = Typography;
+
+
 
 function ClientWorkspace() {
   const {
@@ -34,7 +40,7 @@ function ClientWorkspace() {
 
   const [requestMessage, setRequestMessage] = useState("");
 
-  // 🔥 lazy query (ручной контроль)
+
   const [
     getIssueOrders,
     { data: issueOrdersData, isLoading, error },
@@ -42,6 +48,41 @@ function ClientWorkspace() {
 
   const [sendRequest, { isLoading: isSending }] =
     useCreatePickupRequestMutation();
+
+  const intervalRef = useRef(null);
+
+  const audioQueue = useRef([]);
+  const isPlaying = useRef(false);
+
+  const playSound = (src) => {
+    audioQueue.current.push(src);
+    processQueue();
+  };
+
+  const processQueue = () => {
+    if (isPlaying.current || audioQueue.current.length === 0) return;
+
+    isPlaying.current = true;
+    const src = audioQueue.current.shift();
+    const audio = new Audio(src);
+
+    audio.onended = () => {
+      isPlaying.current = false;
+      processQueue();
+    };
+
+    audio.onerror = () => {
+      console.warn("Ошибка воспроизведения звука:", src);
+      isPlaying.current = false;
+      processQueue();
+    };
+
+    audio.play().catch((err) => {
+      console.error("Audio playback failed:", err);
+      isPlaying.current = false;
+      processQueue();
+    });
+  };
 
   const issueOrders = issueOrdersData?.orders ?? [];
   const pickupReadyOrders = issueOrders.filter(
@@ -60,7 +101,7 @@ function ClientWorkspace() {
   const debounceTimerRef = useRef(null);
 
   useEffect(() => {
-    if (!lastCode || lastCode === emptyCodeValue) return;
+    if (!lastCode) return;
 
     // если уже обрабатывали этот код → стоп
     if (lastProcessedCodeRef.current === lastCode) return;
@@ -74,39 +115,63 @@ function ClientWorkspace() {
       processCode(lastCode);
     }, 1500); // можешь менять (1–2 сек)
 
-    return () => clearTimeout(debounceTimerRef.current);
+    return () => {
+      clearTimeout(debounceTimerRef.current);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    }
   }, [lastCode]);
 
-  // -------------------------------
-  // 🔥 Основная логика
-  // -------------------------------
+
   const processCode = async (code) => {
     if (isProcessingRef.current) return;
 
+    playSound(voice_1_1); // сканирование
     isProcessingRef.current = true;
     lastProcessedCodeRef.current = code;
     setRequestMessage("");
 
     try {
-      // 1. отправка заявки
+      // 1. заявка
       const res = await sendRequest(code).unwrap();
       setRequestMessage(res.message);
 
-      // 2. получение заказов
-      await getIssueOrders(code);
+      // 2. получаем заказы
+      const result = await getIssueOrders(code).unwrap();
 
-      // 3. авто-обновление через 5 сек
+      const orders = result?.orders ?? [];
+      const ready = orders.filter((o) => Number(o?.status) === 29);
+
+      // ✅ ВОТ ТУТ правильное место
+      playSound(ready.length > 0 ? voice_2_1 : voice_3_1);
+
+      // 3. автообновление
       setTimeout(() => {
         getIssueOrders(code);
       }, 5000);
+
     } catch (e) {
       setRequestMessage(
         e?.data?.message || "Ошибка обработки запроса"
       );
+
+      playSound(voice_3_1); // ошибка тоже можно озвучить
     } finally {
       isProcessingRef.current = false;
     }
   };
+
+  // после getIssueOrders(code)
+  if (intervalRef.current) {
+    clearInterval(intervalRef.current);
+  }
+
+  intervalRef.current = setInterval(() => {
+    if (!isProcessingRef.current) {
+      getIssueOrders(lastCode);
+    }
+  }, 120000);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
