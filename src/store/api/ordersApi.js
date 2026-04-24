@@ -12,7 +12,7 @@ export const ordersApi = createApi({
       return headers;
     },
   }),
-  tagTypes: ["DeskRequests", "ClientParcels", "PickupQr"],
+  tagTypes: ["DeskRequests",],
   endpoints: (builder) => ({
     scanClientQr: builder.mutation({
       query: (qrCode) => ({
@@ -22,7 +22,7 @@ export const ordersApi = createApi({
           token: qrCode
         },
       }),
-      invalidatesTags: (_result, _error, arg) => [{ type: "ClientParcels", id: arg?.qrCode }],
+      invalidatesTags: 'DeskRequests',
     }),
     createPickupRequest: builder.mutation({
       query: (parcelIds) => ({
@@ -32,20 +32,20 @@ export const ordersApi = createApi({
           token: parcelIds,
         },
       }),
-      invalidatesTags: (_result, _error, arg) => [{ type: "DeskRequests", id: arg.user.deskId }],
+      invalidatesTags: ["DeskRequests"],
     }),
     getDeskRequests: builder.query({
       query: ({ deskId }) => ({
         url: "/smart/desk-requests",
         method: "GET",
       }),
-      providesTags: (_result, _error, arg) => [{ type: "DeskRequests", id: arg.deskId }],
+      providesTags: ["DeskRequests"],
     }),
     getActivePickupSession: builder.query({
       query: () => ({
         url: `/get/issue-token`,
       }),
-      invalidatesTags: ["order"],
+      invalidatesTags: ["DeskRequests"],
     }),
     generatePickupQr: builder.mutation({
       query: (userGuid) => ({
@@ -53,7 +53,7 @@ export const ordersApi = createApi({
         method: "POST",
         body: { user_guid: userGuid },
       }),
-      invalidatesTags: ["PickupQr"],
+      invalidatesTags: ["DeskRequests"],
     }),
     issueOrder: builder.mutation({
       query: ({ qrToken, userGuid }) => ({
@@ -61,14 +61,14 @@ export const ordersApi = createApi({
         method: "POST",
         body: { token: qrToken },
       }),
-      invalidatesTags: ["PickupQr", "DeskRequests", "ClientParcels"],
+      invalidatesTags: ["DeskRequests"],
     }),
     getIssueOrders: builder.query({
       query: (token) => ({
         url: `/get/orders-by-token`,
         params: { token },
       }),
-      invalidatesTags: ["order"],
+      providesTags: ["DeskRequests"],
     }),
   }),
 });
@@ -80,5 +80,6 @@ export const {
   useGeneratePickupQrMutation,
   useIssueOrderMutation,
   useGetActivePickupSessionQuery,
-  useGetIssueOrdersQuery,
+  useLazyGetIssueOrdersQuery,
+  useGetIssueOrdersQuery
 } = ordersApi;

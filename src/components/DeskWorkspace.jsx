@@ -53,7 +53,7 @@ function DeskWorkspace({ user }) {
 
   return (
     <Space direction="vertical" size={16} className="full-width">
-      <Card>
+      {/* <Card>
         <Title level={4}>Панель точки выдачи</Title>
         <Paragraph type="secondary">
           Система показывает заявки только от привязанных клиентов вашей точки.
@@ -72,7 +72,7 @@ function DeskWorkspace({ user }) {
         {issueMessage ? (
           <Alert showIcon type="info" message={issueMessage} style={{ marginTop: 12 }} />
         ) : null}
-      </Card>
+      </Card> */}
 
       <Card title="Входящие заявки от клиентов">
         {!issueOrdersData?.orders?.length && !isLoading ? (

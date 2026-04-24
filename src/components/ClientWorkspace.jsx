@@ -2,7 +2,6 @@ import {
   Alert,
   Button,
   Card,
-  Checkbox,
   List,
   Space,
   Tag,
@@ -11,22 +10,20 @@ import {
 import { useEffect, useRef, useState } from "react";
 import {
   useCreatePickupRequestMutation,
-  useGetIssueOrdersQuery,
+  useLazyGetIssueOrdersQuery,
 } from "../store/api/ordersApi";
 import ScannerControlCard from "../components/ScannerControlCard";
 import { useSerialScanner } from "./../hooks/useSerialScanner";
 import LatestCodeCard from "../components/LatestCodeCard";
-const { Paragraph, Text, Title } = Typography;
 
-function ClientWorkspace({ user }) {
+const { Text, Title } = Typography;
+
+function ClientWorkspace() {
   const {
     baudRate,
     isConnected,
     isConnecting,
     lastCode,
-    scanHistory,
-    rawLog,
-    errorText,
     setBaudRate,
     connectScanner,
     disconnectScanner,
@@ -34,62 +31,82 @@ function ClientWorkspace({ user }) {
     totalCodes,
     emptyCodeValue,
   } = useSerialScanner();
-  const [greetingText, setGreetingText] = useState("");
-  const [scanError, setScanError] = useState("");
+
   const [requestMessage, setRequestMessage] = useState("");
 
-  const {
-    data: issueOrdersData,
-    isLoading: isIssueOrdersLoading,
-    error: issueOrdersError,
-  } = useGetIssueOrdersQuery(lastCode);
+  // 🔥 lazy query (ручной контроль)
+  const [
+    getIssueOrders,
+    { data: issueOrdersData, isLoading, error },
+  ] = useLazyGetIssueOrdersQuery();
+
   const [sendRequest, { isLoading: isSending }] =
     useCreatePickupRequestMutation();
-  const lastSubmittedSelectionRef = useRef("");
+
   const issueOrders = issueOrdersData?.orders ?? [];
   const pickupReadyOrders = issueOrders.filter(
-    (order) => Number(order?.status) === 29,
+    (o) => Number(o?.status) === 29
   );
 
-  const getSelectionKey = (selection) =>
-    [...selection]
-      .map(String)
-      .sort()
-      .join("|");
+  // -------------------------------
+  // 🔒 Защита от дублей
+  // -------------------------------
+  const lastProcessedCodeRef = useRef("");
+  const isProcessingRef = useRef(false);
 
-  const handleSendRequest = async () => {
-    const selectionKey = getSelectionKey(lastCode);
-    if (!selectionKey) {
-      return;
+  // -------------------------------
+  // ⏱ Debounce
+  // -------------------------------
+  const debounceTimerRef = useRef(null);
+
+  useEffect(() => {
+    if (!lastCode || lastCode === emptyCodeValue) return;
+
+    // если уже обрабатывали этот код → стоп
+    if (lastProcessedCodeRef.current === lastCode) return;
+
+    // debounce (если сканер дергается)
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
     }
 
-    lastSubmittedSelectionRef.current = selectionKey;
+    debounceTimerRef.current = setTimeout(() => {
+      processCode(lastCode);
+    }, 1500); // можешь менять (1–2 сек)
+
+    return () => clearTimeout(debounceTimerRef.current);
+  }, [lastCode]);
+
+  // -------------------------------
+  // 🔥 Основная логика
+  // -------------------------------
+  const processCode = async (code) => {
+    if (isProcessingRef.current) return;
+
+    isProcessingRef.current = true;
+    lastProcessedCodeRef.current = code;
     setRequestMessage("");
+
     try {
-      const result = await sendRequest(lastCode
-      ).unwrap();
-      setRequestMessage(result.message);
-    } catch (error) {
-      setRequestMessage(error?.data?.message ?? "Ошибка отправки заявки.");
+      // 1. отправка заявки
+      const res = await sendRequest(code).unwrap();
+      setRequestMessage(res.message);
+
+      // 2. получение заказов
+      await getIssueOrders(code);
+
+      // 3. авто-обновление через 5 сек
+      setTimeout(() => {
+        getIssueOrders(code);
+      }, 5000);
+    } catch (e) {
+      setRequestMessage(
+        e?.data?.message || "Ошибка обработки запроса"
+      );
+    } finally {
+      isProcessingRef.current = false;
     }
   };
-
-  useEffect(() => {
-    const selectionKey = getSelectionKey(lastCode);
-    if (!selectionKey || selectionKey === lastSubmittedSelectionRef.current || isSending) {
-      return undefined;
-    }
-
-    const timeoutId = setTimeout(() => {
-      handleSendRequest();
-    }, 2000);
-
-    return () => clearTimeout(timeoutId);
-  }, [isSending, lastCode]);
-
-  useEffect(() => {
-    handleSendRequest()
-  }, [lastCode]);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
@@ -104,74 +121,57 @@ function ClientWorkspace({ user }) {
           onClear={clearLog}
         />
       )}
+
       <LatestCodeCard
         lastCode={lastCode}
         totalCodes={totalCodes}
         emptyCodeValue={emptyCodeValue}
       />
+
+      {/* ------------------- */}
+      {/* ЗАЯВКА */}
+      {/* ------------------- */}
+      {requestMessage && (
+        <Alert showIcon type="success" message={requestMessage} />
+      )}
+
+      {/* ------------------- */}
+      {/* ЗАКАЗЫ */}
+      {/* ------------------- */}
       <Card className="client-card">
-        <Title level={3}>Терминал клиента</Title>
-        <Paragraph type="secondary">
-          Ожидание сканирования QR клиента.
-        </Paragraph>
+        <Title level={4}>Заказы</Title>
 
-
-        {scanError ? (
+        {error && (
           <Alert
             showIcon
             type="error"
-            message={scanError}
-            style={{ marginTop: 16 }}
+            message="Ошибка загрузки заказов"
           />
-        ) : null}
-        {greetingText ? (
-          <Alert
-            showIcon
-            type="success"
-            message={greetingText}
-            style={{ marginTop: 16 }}
-          />
-        ) : null}
-      </Card>
+        )}
 
-      <Card className="client-card">
-        <Title level={4}>Заказы:</Title>
-
-        {issueOrdersError ? (
-          <Alert
-            showIcon
-            type="error"
-            message="Не удалось загрузить заказы по токену."
-          />
-        ) : null}
-
-        {!issueOrdersError &&
-          !pickupReadyOrders.length &&
-          !isIssueOrdersLoading ? (
+        {!error && !pickupReadyOrders.length && !isLoading && (
           <Alert
             showIcon
             type="info"
-            message="Доступных заказов к выдаче нет."
+            message="Нет заказов к выдаче"
           />
-        ) : null}
+        )}
 
         <List
-          loading={isIssueOrdersLoading}
+          loading={isLoading}
           dataSource={pickupReadyOrders}
           renderItem={(order) => (
             <List.Item>
-              <Card
-                size="small"
-                className="parcel-row"
-                style={{ width: "100%" }}
-              >
-                <Space direction="vertical" size={4}>
+              <Card size="small" style={{ width: "100%" }}>
+                <Space direction="vertical">
                   <Text strong>{order.tracking_number}</Text>
-                  <Text type="secondary">GUID: {order.guid}</Text>
+                  <Text type="secondary">{order.guid}</Text>
                   <Space>
-                    <Tag color="green">Готов к выдаче</Tag>
+                    <Tag color="green">Готов</Tag>
                     <Text type="secondary">
-                      {new Date(order.created_date).toLocaleString("ru-RU")}
+                      {new Date(
+                        order.created_date
+                      ).toLocaleString("ru-RU")}
                     </Text>
                   </Space>
                 </Space>
@@ -180,8 +180,6 @@ function ClientWorkspace({ user }) {
           )}
         />
       </Card>
-
-
     </Space>
   );
 }
