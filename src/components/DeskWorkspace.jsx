@@ -1,41 +1,98 @@
-import { Alert, Button, Card, Input, List, Space, Tag, Typography } from "antd";
-import { useEffect, useState } from "react";
-import { useGetDeskRequestsQuery, useGetIssueOrdersQuery, useScanClientQrMutation } from "../store/api/ordersApi";
+import {
+  Alert,
+  Button,
+  Card,
+  Checkbox,
+  List,
+  Space,
+  Tag,
+  Typography,
+} from "antd";
+import { useEffect, useMemo, useState } from "react";
+import {
+  useGetDeskRequestsQuery,
+  useGetIssueOrdersQuery,
+  useScanClientQrMutation,
+} from "../store/api/ordersApi";
 
-const { Paragraph, Text, Title } = Typography;
+const { Text, Title } = Typography;
 
 function DeskWorkspace({ user }) {
-  const [qrTokenInput, setQrTokenInput] = useState(
-  );
-  const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
-  const [issueMessage, setIssueMessage] = useState("");
-  const [issueStatus, setIssueStatus] = useState(""); // success | error
-  const { data: deskRequestsData, isLoading } = useGetDeskRequestsQuery(
+  const [qrTokenInput, setQrTokenInput] = useState("");
+  const [selectedOrders, setSelectedOrders] = useState([]);
+
+  const [scanQr, { isLoading: isScanning }] =
+    useScanClientQrMutation();
+
+  const [issueMessage, setIssueMessage] =
+    useState("");
+  const [issueStatus, setIssueStatus] =
+    useState("");
+
+  /* -------------------- */
+  /* Заявки клиентов */
+  /* -------------------- */
+  const {
+    data: deskRequestsData,
+    isLoading,
+  } = useGetDeskRequestsQuery(
     { deskId: user.deskId },
-    { pollingInterval: 5000 },
+    { pollingInterval: 5000 }
   );
+
+  /* -------------------- */
+  /* Заказы по QR */
+  /* -------------------- */
   const {
     data: issueOrdersData,
     isLoading: isIssuing,
-    error: issueOrdersError,
-    refetch
-  } = useGetIssueOrdersQuery(qrTokenInput);
+    refetch,
+  } = useGetIssueOrdersQuery(qrTokenInput, {
+    skip: !qrTokenInput,
+  });
 
-  const handleIssueByEnter = async () => {
-    if (!qrTokenInput.trim()) {
-      setIssueMessage("Введите QR токен.");
-      return;
-    }
+  const orders =
+    issueOrdersData?.orders || [];
 
-    try {
-      await issueOrder({ qrToken: qrTokenInput.trim(), userGuid: user.id }).unwrap();
-      setIssueMessage("Заказ выдан успешно.");
-      setQrTokenInput("");
-    } catch (error) {
-      setIssueMessage(error?.data?.message ?? "Не удалось выдать заказ.");
+  /* -------------------- */
+  /* Автозаполнение QR */
+  /* -------------------- */
+  useEffect(() => {
+    if (deskRequestsData?.success) {
+      setQrTokenInput(
+        deskRequestsData.result?.qr_token
+      );
+      setIssueMessage("");
     }
+  }, [deskRequestsData]);
+
+  /* -------------------- */
+  /* Выбрать все */
+  /* -------------------- */
+  useEffect(() => {
+    if (orders.length) {
+      setSelectedOrders(
+        orders.map((x) => x.guid)
+      );
+    } else {
+      setSelectedOrders([]);
+    }
+  }, [issueOrdersData]);
+
+  /* -------------------- */
+  /* Toggle */
+  /* -------------------- */
+  const toggleOrder = (guid) => {
+    setSelectedOrders((prev) =>
+      prev.includes(guid)
+        ? prev.filter((x) => x !== guid)
+        : [...prev, guid]
+    );
   };
 
+  /* -------------------- */
+  /* Выдать */
+  /* -------------------- */
   const handleScan = async () => {
     if (!qrTokenInput) {
       setIssueStatus("error");
@@ -43,81 +100,189 @@ function DeskWorkspace({ user }) {
       return;
     }
 
+    if (!selectedOrders.length) {
+      setIssueStatus("error");
+      setIssueMessage(
+        "Выберите хотя бы один заказ"
+      );
+      return;
+    }
+
     try {
-      const result = await scanQr(qrTokenInput).unwrap();
+      const result = await scanQr({
+        token: qrTokenInput,
+        orders: selectedOrders,
+        userGuid: user.id,
+      }).unwrap();
 
       setIssueStatus("success");
-      setIssueMessage(result?.message || "Заказ успешно выдан");
+      setIssueMessage(
+        result?.message ||
+        "Заказы успешно выданы"
+      );
 
-      // 🔥 ВАЖНО: обновляем после выдачи
+      setSelectedOrders([]);
       await refetch();
-
     } catch (error) {
       setIssueStatus("error");
-      setIssueMessage(error?.data?.message || "Ошибка выдачи");
+      setIssueMessage(
+        error?.data?.message ||
+        "Ошибка выдачи"
+      );
     }
   };
 
-  useEffect(() => {
-    if (deskRequestsData?.success) {
-      setQrTokenInput(deskRequestsData.result?.qr_token);
-      setIssueMessage(null)
-    }
-  }, [deskRequestsData]);
-
   return (
-    <Space direction="vertical" size={16} className="full-width">
-      {/* <Card>
-        <Title level={4}>Панель точки выдачи</Title>
-        <Paragraph type="secondary">
-          Система показывает заявки только от привязанных клиентов вашей точки.
-        </Paragraph>
-        <Space>
-          <Tag color="blue">Точка: {user.name}</Tag>
-        </Space>
-        <Input
-          placeholder="Введите qr_token и нажмите Enter"
-          value={qrTokenInput}
-          onChange={(event) => setQrTokenInput(event.target.value)}
-          onPressEnter={handleIssueByEnter}
-          disabled={isIssuing}
-          style={{ marginTop: 12 }}
-        />
-        {issueMessage ? (
-          <Alert showIcon type="info" message={issueMessage} style={{ marginTop: 12 }} />
-        ) : null}
-      </Card> */}
-
-      <Card title="Входящие заявки от клиентов">
-        {!issueOrdersData?.orders?.length && !isLoading ? (
-          <Alert type="info" showIcon message="Новых заявок пока нет." />
-        ) : (
-          <List
-            loading={isLoading}
-            dataSource={issueOrdersData?.orders}
-            renderItem={(item) => (
-              <List.Item>
-                <Space direction="vertical" size={2}>
-                  <Text strong>
-                    {item.tracking_number}
-                  </Text>
-                  <Text type="secondary">Дата создания: {item.created_date}</Text>
-                  {/* <Text>К выдаче: {item.tracking_number}</Text> */}
-                </Space>
-              </List.Item>
-            )}
+    <Space
+      direction="vertical"
+      size={16}
+      className="full-width"
+      style={{ width: "100%" }}
+    >
+      {/* ---------------- */}
+      {/* ЗАКАЗЫ */}
+      {/* ---------------- */}
+      <Card
+        title={`Заказы клиента (${orders.length})`}
+      >
+        {!orders.length &&
+          !isIssuing ? (
+          <Alert
+            type="info"
+            showIcon
+            message="Нет заказов для выдачи"
           />
+        ) : (
+          <>
+            <div
+              style={{
+                marginBottom: 12,
+              }}
+            >
+              <Space>
+                <Button
+                  size="small"
+                  onClick={() =>
+                    setSelectedOrders(
+                      orders.map(
+                        (x) => x.guid
+                      )
+                    )
+                  }
+                >
+                  Выбрать все
+                </Button>
+
+                <Button
+                  size="small"
+                  onClick={() =>
+                    setSelectedOrders([])
+                  }
+                >
+                  Очистить
+                </Button>
+              </Space>
+            </div>
+
+            <List
+              loading={isIssuing}
+              dataSource={orders}
+              renderItem={(item) => {
+                const checked =
+                  selectedOrders.includes(
+                    item.guid
+                  );
+
+                return (
+                  <List.Item
+                    onClick={() =>
+                      toggleOrder(
+                        item.guid
+                      )
+                    }
+                    style={{
+                      cursor:
+                        "pointer",
+                      background:
+                        checked
+                          ? "#f6ffed"
+                          : "",
+                      borderRadius: 8,
+                      padding:
+                        "10px 12px",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <Space
+                      align="start"
+                    >
+                      <Checkbox
+                        checked={
+                          checked
+                        }
+                      />
+
+                      <Space
+                        direction="vertical"
+                        size={2}
+                      >
+                        <Text strong>
+                          {
+                            item.tracking_number
+                          }
+                        </Text>
+
+                        <Text type="secondary">
+                          {
+                            item.country
+                          }
+                        </Text>
+
+                        <Text type="secondary">
+                          {
+                            item.created_date
+                          }
+                        </Text>
+
+                        <Tag color="green">
+                          Готов
+                        </Tag>
+                      </Space>
+                    </Space>
+                  </List.Item>
+                );
+              }}
+            />
+          </>
         )}
       </Card>
-      <Button onClick={() => {
-        handleScan();
-      }}>Выдать</Button>
+
+      {/* ---------------- */}
+      {/* КНОПКА */}
+      {/* ---------------- */}
+      <Button
+        type="primary"
+        size="large"
+        loading={isScanning}
+        onClick={handleScan}
+      >
+        Выдать выбранные (
+        {selectedOrders.length})
+      </Button>
+
+      {/* ---------------- */}
+      {/* РЕЗУЛЬТАТ */}
+      {/* ---------------- */}
       {issueMessage && (
         <Alert
           showIcon
-          type={issueStatus === "success" ? "success" : "error"}
+          type={
+            issueStatus ===
+              "success"
+              ? "success"
+              : "error"
+          }
           message={issueMessage}
-          style={{ marginTop: 12 }}
         />
       )}
     </Space>

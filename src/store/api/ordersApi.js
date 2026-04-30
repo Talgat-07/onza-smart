@@ -15,12 +15,10 @@ export const ordersApi = createApi({
   tagTypes: ["DeskRequests",],
   endpoints: (builder) => ({
     scanClientQr: builder.mutation({
-      query: (qrCode) => ({
-        url: "/smart/issue-token-order",
+      query: (body) => ({
+        url: "/smart/issue-token-by-order",
         method: "POST",
-        body: {
-          token: qrCode
-        },
+        body: body,
       }),
       invalidatesTags: ['DeskRequests'],
     }),
