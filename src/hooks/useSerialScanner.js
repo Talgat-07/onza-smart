@@ -4,7 +4,7 @@ import { message } from "antd";
 const DEFAULT_BAUD_RATE = 9600;
 const MAX_CODES = 150;
 const MAX_RAW_LOG_SIZE = 8000;
-const EMPTY_CODE_VALUE = "87f5a1a748889d331d336f2a121f47986885c5d57dacf79ba24969df7d5f3866";
+const EMPTY_CODE_VALUE = "c1fdc8580fed6f6375ec05d4e777424f2efe4161d0331d2ef3b4b8a70449e697";
 
 function formatError(error) {
   return error instanceof Error ? error.message : "Неизвестная ошибка";

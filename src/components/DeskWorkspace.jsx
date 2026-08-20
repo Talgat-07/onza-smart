@@ -63,11 +63,14 @@ function DeskWorkspace({ user }) {
       setIssueMessage(null)
     }
   }, [deskRequestsData]);
+  console.log(deskRequestsData);
 
   return (
     <Space direction="vertical" size={16} className="full-width">
 
       <Card title="Входящие заявки от клиентов">
+        <h3 >Код клиента: {issueOrdersData?.user?.client_code}</h3>
+        <h3 >Имя клиента: {issueOrdersData?.user?.last_name} {issueOrdersData?.user?.first_name}</h3>
         {!issueOrdersData?.orders?.length && !isLoading ? (
           <Alert type="info" showIcon message="Новых заявок пока нет." />
         ) : (
