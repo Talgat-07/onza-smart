@@ -4,7 +4,7 @@ import { message } from "antd";
 const DEFAULT_BAUD_RATE = 9600;
 const MAX_CODES = 150;
 const MAX_RAW_LOG_SIZE = 8000;
-const EMPTY_CODE_VALUE = "c1fdc8580fed6f6375ec05d4e777424f2efe4161d0331d2ef3b4b8a70449e697";
+const EMPTY_CODE_VALUE = "928c2e5a836ba3cd6d0f4a109defc99873c30e584744b03246927e21bfa92668";
 
 function formatError(error) {
   return error instanceof Error ? error.message : "Неизвестная ошибка";
@@ -216,3 +216,13 @@ export function useSerialScanner() {
     emptyCodeValue: EMPTY_CODE_VALUE,
   };
 }
+
+
+// 25452728
+// 28.01.2026, 18:51:35
+// Готов к выдаче
+// 1235566432333323256797738829191001262562829101099999
+// 10.02.2026, 22:20:54
+// Готов к выдаче
+// 537266262853
+// 30.12.2025, 02:29:25

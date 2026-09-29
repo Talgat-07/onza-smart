@@ -1,105 +1,195 @@
-import { Alert, Button, Card, Input, List, Space, Tag, Typography } from "antd";
+import { Alert, Button, Card, List, Space, Tag, Typography } from "antd";
 import { useEffect, useState } from "react";
-import { useGetDeskRequestsQuery, useGetIssueOrdersQuery, useScanClientQrMutation } from "../store/api/ordersApi";
+import {
+  useLazyGetIssueOrdersQuery,
+  useScanClientQrMutation,
+} from "../store/api/ordersApi";
+import { useSerialScanner } from "../hooks/useSerialScanner";
+import ScannerControlCard from "./ScannerControlCard";
 
-const { Paragraph, Text, Title } = Typography;
+const { Text } = Typography;
 
-function DeskWorkspace({ user }) {
-  const [qrTokenInput, setQrTokenInput] = useState(
-  );
-  const [scanQr, { isLoading: isScanning }] = useScanClientQrMutation();
-  const [issueMessage, setIssueMessage] = useState("");
-  const [issueStatus, setIssueStatus] = useState(""); // success | error
-  const { data: deskRequestsData, isLoading } = useGetDeskRequestsQuery(
-    { deskId: user.deskId },
-    { pollingInterval: 5000 },
-  );
+const READY_STATUS = 29;
+
+function DeskWorkspace() {
   const {
-    data: issueOrdersData,
-    isLoading: isIssuing,
-    error: issueOrdersError,
-    refetch
-  } = useGetIssueOrdersQuery(qrTokenInput);
+    baudRate,
+    isConnected,
+    isConnecting,
+    scanHistory,
+    errorText,
+    setBaudRate,
+    connectScanner,
+    disconnectScanner,
+    clearLog,
+    emptyCodeValue
+  } = useSerialScanner();
 
-  const handleIssueByEnter = async () => {
-    if (!qrTokenInput.trim()) {
-      setIssueMessage("Введите QR токен.");
-      return;
-    }
+  const [token, setToken] = useState("");
+  const [result, setResult] = useState(null); // { type: "success" | "error", text }
 
-    try {
-      await issueOrder({ qrToken: qrTokenInput.trim(), userGuid: user.id }).unwrap();
-      setIssueMessage("Заказ выдан успешно.");
-      setQrTokenInput("");
-    } catch (error) {
-      setIssueMessage(error?.data?.message ?? "Не удалось выдать заказ.");
-    }
-  };
+  const [getOrders, { currentData, isFetching, error }] =
+    useLazyGetIssueOrdersQuery();
+  const [issueByToken, { isLoading: isIssuing }] = useScanClientQrMutation();
 
-  const handleScan = async () => {
-    if (!qrTokenInput) {
-      setIssueStatus("error");
-      setIssueMessage("Нет QR токена");
-      return;
-    }
-
-    try {
-      const result = await scanQr(qrTokenInput).unwrap();
-
-      setIssueStatus("success");
-      setIssueMessage(result?.message || "Заказ успешно выдан");
-
-      await refetch();
-
-    } catch (error) {
-      setIssueStatus("error");
-      setIssueMessage(error?.data?.message || "Ошибка выдачи");
-    }
-  };
+  // Каждый новый скан (даже такой же код повторно) имеет уникальный id
+  const lastScan = scanHistory[0];
 
   useEffect(() => {
-    if (deskRequestsData?.success) {
-      setQrTokenInput(deskRequestsData.result?.qr_token);
-      setIssueMessage(null)
+    // if (!lastScan) return;
+    setToken(emptyCodeValue);
+    setResult(null);
+    getOrders(emptyCodeValue);
+  }, [emptyCodeValue]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const orders = currentData?.orders ?? [];
+  const client = currentData?.user;
+  const readyCount = orders.filter((o) => Number(o?.status) === READY_STATUS).length;
+
+  const handleIssue = async () => {
+    if (!token) return;
+
+    try {
+      const res = await issueByToken(token).unwrap();
+
+      if (!res?.success) {
+        setResult({
+          type: "error",
+          text: `${res?.message || "Ошибка выдачи заказа"}. Сгенерируйте новый токен.`
+        });
+
+        return;
+      }
+
+      setResult({
+        type: "success",
+        text: res?.message || "Заказ успешно выдан"
+      });
+
+      await getOrders(token).unwrap().catch(() => { });
+
+    } catch (e) {
+      console.error("ISSUE ERROR:", e);
+
+      const message =
+        e?.data?.message ||
+        e?.error ||
+        "Ошибка выдачи заказа";
+
+      setResult({
+        type: "error",
+        text: `${message}. Сгенерируйте новый токен.`
+      });
     }
-  }, [deskRequestsData]);
-  console.log(deskRequestsData);
+  };
+
+  const handleReset = () => {
+    setToken("");
+    setResult(null);
+    clearLog();
+  };
 
   return (
-    <Space direction="vertical" size={16} className="full-width">
+    <Space direction="vertical" size={16} style={{ width: "100%" }}>
+      {!isConnected ? (
+        <ScannerControlCard
+          isConnected={isConnected}
+          isConnecting={isConnecting}
+          baudRate={baudRate}
+          onBaudRateChange={setBaudRate}
+          onConnect={connectScanner}
+          onDisconnect={disconnectScanner}
+          onClear={clearLog}
+        />
+      ) : (
+        <Space>
+          <Tag color="success">Сканер подключен</Tag>
+          <Button size="small" onClick={() => disconnectScanner()}>
+            Отключить
+          </Button>
+        </Space>
+      )}
 
-      <Card title="Входящие заявки от клиентов">
-        <h3 >Код клиента: {issueOrdersData?.user?.client_code}</h3>
-        <h3 >Имя клиента: {issueOrdersData?.user?.last_name} {issueOrdersData?.user?.first_name}</h3>
-        {!issueOrdersData?.orders?.length && !isLoading ? (
-          <Alert type="info" showIcon message="Новых заявок пока нет." />
-        ) : (
-          <List
-            loading={isLoading}
-            dataSource={issueOrdersData?.orders}
-            renderItem={(item) => (
-              <List.Item>
-                <Space direction="vertical" size={2}>
-                  <Text strong>
-                    {item.tracking_number}
-                  </Text>
-                  <Text type="secondary">Дата создания: {item.created_date}</Text>
-                </Space>
-              </List.Item>
-            )}
+      {errorText && <Alert showIcon type="error" message={errorText} />}
+
+      <Card
+        title="Заказы клиента"
+        extra={token && <Button onClick={handleReset}>Сбросить</Button>}
+      >
+        {!token && (
+          <Alert
+            type="info"
+            showIcon
+            message="Отсканируйте QR-код клиента"
           />
         )}
+
+        {token && (
+          <>
+            {client && (
+              <Space direction="vertical" size={2} style={{ marginBottom: 16 }}>
+                <Text strong>Код клиента: {client.client_code}</Text>
+                <Text>
+                  {client.last_name} {client.first_name}
+                </Text>
+              </Space>
+            )}
+
+            {error && (
+              <Alert
+                showIcon
+                type="error"
+                message={error?.data?.message || "Ошибка загрузки заказов"}
+              />
+            )}
+
+            {!error && !isFetching && !orders.length && (
+              <Alert type="warning" showIcon message="Заказы не найдены" />
+            )}
+
+            <List
+              loading={isFetching}
+              dataSource={orders}
+              renderItem={(item) => (
+                <List.Item>
+                  <Space
+                    style={{ width: "100%", justifyContent: "space-between" }}
+                    align="start"
+                  >
+                    <Space direction="vertical" size={2}>
+                      <Text strong>{item.tracking_number}</Text>
+                      <Text type="secondary">
+                        {new Date(item.created_date).toLocaleString("ru-RU")}
+                      </Text>
+                    </Space>
+                    {Number(item.status) === READY_STATUS ? (
+                      <Tag color="success">Готов к выдаче</Tag>
+                    ) : (
+                      <Tag>Статус: {item.status}</Tag>
+                    )}
+                  </Space>
+                </List.Item>
+              )}
+            />
+          </>
+        )}
       </Card>
-      <Button onClick={() => {
-        handleScan();
-      }}>Выдать</Button>
-      {issueMessage && (
-        <Alert
-          showIcon
-          type={issueStatus === "success" ? "success" : "error"}
-          message={issueMessage}
-          style={{ marginTop: 12 }}
-        />
+
+      {token && (
+        <Button
+          type="primary"
+          size="large"
+          block
+          loading={isIssuing}
+          disabled={!readyCount || isFetching}
+          onClick={handleIssue}
+        >
+          Выдать{readyCount ? ` (${readyCount})` : ""}
+        </Button>
+      )}
+
+      {result && (
+        <Alert showIcon type={result.type} message={result.text} />
       )}
     </Space>
   );

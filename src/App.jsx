@@ -7,7 +7,6 @@ import {
 } from "antd";
 import "./App.css";
 import { useDispatch, useSelector } from "react-redux";
-import ClientWorkspace from "./components/ClientWorkspace";
 import DeskWorkspace from "./components/DeskWorkspace";
 import LoginForm from "./components/LoginForm";
 import { logout } from "./store/slices/authSlice";
@@ -36,25 +35,22 @@ function App() {
     >
       {isAuthenticated ? (
         <Layout className={`app-layout ${isDesk ? "" : "client-layout"}`}>
-          {isDesk ? (
-            <Header className="app-header">
-              <div>
-                <Title level={3} className="app-title">
-                  Smart Pickup Console
-                </Title>
-                <Text className="app-subtitle">
-                  QR-получение посылок с разделением ролей клиент/выдача
-                </Text>
-              </div>
-              <Space>
-                <Text className="app-user-text">Роль: Выдача | {user?.name ?? "User"}</Text>
-                <Button onClick={onLogout}>Выйти</Button>
-              </Space>
-            </Header>
-          ) : null}
-
+          <Header className="app-header">
+            <div>
+              <Title level={3} className="app-title">
+                Smart Pickup Console
+              </Title>
+              <Text className="app-subtitle">
+                QR-получение посылок с разделением ролей клиент/выдача
+              </Text>
+            </div>
+            <Space>
+              <Text className="app-user-text">Роль: Выдача | {user?.name ?? "User"}</Text>
+              <Button onClick={onLogout}>Выйти</Button>
+            </Space>
+          </Header>
           <Content className={`app-content ${isDesk ? "" : "client-content"}`}>
-            {isDesk ? <DeskWorkspace user={user} /> : <ClientWorkspace user={user} />}
+            <DeskWorkspace user={user} />
           </Content>
         </Layout>
       ) : (
